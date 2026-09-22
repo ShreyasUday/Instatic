@@ -1,5 +1,5 @@
 /**
- * `/_instatic/hole-runtime.js` and `/_instatic/hole/<nodeId>` endpoints — Layer C server islands.
+ * `/_instatic/hole-runtime.js` and `/_instatic/hole/<nodeId>` endpoints - Layer C server islands.
  *
  * The runtime asset is a tiny JavaScript module (~1.1 KB) that uses
  * IntersectionObserver to lazily fetch rendered fragments for `<instatic-hole>`
@@ -12,9 +12,9 @@
  * request-dependent loop sources via `ctx.request`.
  *
  * Two cache tiers (see `LoopEntitySource.requestDependent` / `perVisitor`):
- *   - SHARED hole — cached by Layer B keyed on `(nodeId, page-query, version)`.
+ *   - SHARED hole: cached by Layer B keyed on `(nodeId, page-query, version)`.
  *     The source's `fetch()` runs once per publish-version per distinct query.
- *   - PER-VISITOR hole — bypasses Layer B, reads request cookies, re-renders on
+ *   - PER-VISITOR hole: bypasses Layer B, reads request cookies, re-renders on
  *     every page load, and responds with `Cache-Control: no-store`.
  *
  * Version-awareness: the hole runtime stamps `data-instatic-version` on each
@@ -22,7 +22,7 @@
  * mismatch returns a lightweight stale sentinel so the next page load picks up
  * the new version.
  *
- * Inside the hole endpoint the RenderConfig has no `dynamicNodeIds` — the node
+ * Inside the hole endpoint the RenderConfig has no `dynamicNodeIds`: the node
  * subtree is rendered fully (it is already the request-time dynamic part).
  *
  * Originating content-template page URLs (`u`) resolve their published entry
@@ -61,7 +61,7 @@ export function serveHoleRuntimeAsset(): Response {
   return new Response(HOLE_RUNTIME_JS, {
     headers: {
       'content-type': 'application/javascript; charset=utf-8',
-      // Cache for 1 hour — the path is a well-known fixed CMS asset that
+      // Cache for 1 hour: the path is a well-known fixed CMS asset that
       // only changes on a CMS version bump. Use deploy-time cache-busting
       // (e.g. append a build hash) if you need longer caching.
       'cache-control': 'public, max-age=3600',
@@ -73,9 +73,9 @@ interface HoleHandlerContext {
   db: DbClient
 }
 
-// The versioned snapshot memo + nodeId → page index live in
+// The versioned snapshot memo + nodeId -> page index live in
 // `publish/publishedSnapshotCache.ts`, shared with the public router and the
-// loop endpoint — request-time lookup is O(1) and warm requests do zero DB I/O.
+// loop endpoint: request-time lookup is O(1) and warm requests do zero DB I/O.
 
 // ---------------------------------------------------------------------------
 // Request helpers
@@ -103,7 +103,7 @@ function normalizeQuery(params: URLSearchParams): string {
 
 /**
  * Whether a hole must be rendered per visitor (bypass cache, read cookies).
- * Only `perVisitor` loop sources qualify — a module `render()` cannot read
+ * Only `perVisitor` loop sources qualify: a module `render()` cannot read
  * cookies, so module holes are always shared-cacheable.
  */
 function isPerVisitorHole(node: PageNode): boolean {
@@ -185,7 +185,7 @@ async function renderHoleFragment(
     cspSources: new Map(),
   }
   // Hole fragments bypass the published-HTML pipeline, so CMS forms inside
-  // them would never receive their page token. Stamp here — tokens are
+  // them would never receive their page token. Stamp here: tokens are
   // stateless HMAC signatures, safe to store in the Layer B fragment cache.
   return stampFormPageTokens(renderNode(nodeId, config, acc), page.id)
 }
@@ -215,7 +215,7 @@ export async function handleHoleRequest(
     })
   }
 
-  // Version check — if the ?v= param doesn't match the current publish version,
+  // Version check: if the ?v= param doesn't match the current publish version,
   // return a lightweight stale sentinel without caching. The next full page load
   // will carry the correct version in its placeholder attributes.
   const requestVersion = url.searchParams.get('v') ?? ''
@@ -258,7 +258,7 @@ export async function handleHoleRequest(
 
   const perVisitor = isPerVisitorHole(node)
   const route = buildRouteFrame(pageUrl.toString())
-  // Parsed query params of the originating page request — handed to a
+  // Parsed query params of the originating page request: handed to a
   // request-dependent loop source's `fetch()` via `ctx.request.query`.
   const query: Record<string, string> = Object.fromEntries(pageUrl.searchParams)
 
