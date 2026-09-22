@@ -25,9 +25,9 @@
  * Inside the hole endpoint the RenderConfig has no `dynamicNodeIds` — the node
  * subtree is rendered fully (it is already the request-time dynamic part).
  *
- * Known v1 limitation: a hole that sits inside a per-entry content-template
- * page does not yet resolve `currentEntry.*` (no entry id is forwarded). Holes
- * are intended for `route.query`, live external data, and per-visitor content.
+ * Originating content-template page URLs (`u`) resolve their published entry
+ * row and seed `entryStack`, enabling `{currentEntry.*}` bindings to resolve
+ * seamlessly inside dynamic holes alongside `{route.query.*}`.
  *
  * Fragments get form page tokens stamped (stampFormPageTokens) so CMS forms
  * inside holes can submit; the form runtime itself reaches the page via the
@@ -36,7 +36,7 @@
 
 import type { DbClient } from '../../db/client'
 import type { Page, PageNode, SiteDocument } from '@core/page-tree'
-import type { SourceRequestContext } from '@core/loops/types'
+import type { LoopItem, SourceRequestContext } from '@core/loops/types'
 import { registry } from '@core/module-engine'
 import { loopSourceRegistry } from '@core/loops/registry'
 import { renderNode, type RenderConfig, type RenderAccumulators } from '@core/publisher'
@@ -47,6 +47,8 @@ import { getPublishedNodeIndexForVersion } from '../../publish/publishedSnapshot
 import { getPublishVersion } from '../../publish/publishState'
 import { HOLE_RUNTIME_JS } from '../../publish/holeRuntime'
 import { stampFormPageTokens } from '../../forms/formRuntime'
+import { contentRouteFromPath } from '../../publish/publicRouter'
+import { getPublishedDataRowByRoute } from '../../repositories/data/publish'
 
 const HOLE_RUNTIME_PATH = '/_instatic/hole-runtime.js'
 const HOLE_PATH_PREFIX = '/_instatic/hole/'
@@ -112,6 +114,37 @@ function isPerVisitorHole(node: PageNode): boolean {
 }
 
 /**
+ * Resolve the originating entry row for content template pages (e.g. `/courses/time-management`),
+ * so `{currentEntry.*}` bindings resolve inside Layer C dynamic holes.
+ */
+async function resolveOriginatingEntry(
+  db: DbClient,
+  pageUrl: URL,
+): Promise<LoopItem[]> {
+  const routeContent = contentRouteFromPath(pageUrl.pathname)
+  if (!routeContent) return []
+
+  const row = await getPublishedDataRowByRoute(
+    db,
+    routeContent.tableRouteBase,
+    routeContent.rowSlug,
+  )
+  if (!row) return []
+
+  return [
+    {
+      id: row.id,
+      slug: row.slug,
+      fields: {
+        id: row.id,
+        slug: row.slug,
+        ...row.cellsJson,
+      },
+    },
+  ]
+}
+
+/**
  * Render one node subtree at request time. Builds the same named frames the
  * full-page publisher builds (route/page/site) plus pre-fetched loop data for
  * loops INSIDE this subtree, then renders fully (no `<instatic-hole>` recursion).
@@ -125,6 +158,7 @@ async function renderHoleFragment(
   request: SourceRequestContext,
 ): Promise<string> {
   const route = buildRouteFrame(pageUrl.toString())
+  const entryStack = await resolveOriginatingEntry(db, pageUrl)
   const loopData = await prefetchLoopData(page, site, db, pageUrl, {
     request,
     rootNodeId: nodeId,
@@ -136,7 +170,7 @@ async function renderHoleFragment(
     breakpointId: undefined,
     loopData,
     templateContext: {
-      entryStack: [],
+      entryStack,
       page: buildPageFrame(page),
       site: buildSiteFrame(site),
       route,
